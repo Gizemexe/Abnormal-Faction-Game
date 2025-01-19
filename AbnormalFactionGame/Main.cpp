@@ -9,7 +9,7 @@ const int hareketMesafesi = 10; // Hareket mesafesi (piksel)
 int arkaplanPosX = 0; // Arka planın başlangıç pozisyonu
 const int pencereGenislik = 800, pencereYukseklik = 600;
 int arkaplanGenislik = 1600, arkaplanYukseklik = 600; // Arka plan boyutları
-ICBYTES arkaplan, arkaplan2; // İki arka plan resmi
+ICBYTES arkaplanilk, arkaplandevam; // İki arka plan resmi
 
 // Karakter animasyonu için değişkenler
 ICBYTES karakter; // Karakter sprite dosyası
@@ -39,25 +39,28 @@ void KarakterCiz(ICBYTES& ekran) {
 void ekraniCiz() {
     ICBYTES ekran;
     CreateMatrix(ekran, pencereGenislik, pencereYukseklik, 3, ICB_UCHAR);
-    ekran = 255;
 
+    // Ekranı tamamen arkaplan ile kaplamak için boş bırakma
     for (int y = 0; y < pencereYukseklik; y++) {
         for (int x = 0; x < pencereGenislik; x++) {
-            if (arkaplanPosX + x < arkaplanGenislik) {
-                ekran.C(x, y, 0) = arkaplan.C(arkaplanPosX + x, y, 0);
-                ekran.C(x, y, 1) = arkaplan.C(arkaplanPosX + x, y, 1);
-                ekran.C(x, y, 2) = arkaplan.C(arkaplanPosX + x, y, 2);
+            int globalX = arkaplanPosX + x;
+            if (globalX < 800) {
+                ekran.C(x, y, 0) = arkaplanilk.C(globalX, y, 0);
+                ekran.C(x, y, 1) = arkaplanilk.C(globalX, y, 1);
+                ekran.C(x, y, 2) = arkaplanilk.C(globalX, y, 2);
             }
-            else if (arkaplanPosX + x >= arkaplanGenislik && arkaplanPosX + x < 2 * arkaplanGenislik) {
-                ekran.C(x, y, 0) = arkaplan2.C(arkaplanPosX + x - arkaplanGenislik, y, 0);
-                ekran.C(x, y, 1) = arkaplan2.C(arkaplanPosX + x - arkaplanGenislik, y, 1);
-                ekran.C(x, y, 2) = arkaplan2.C(arkaplanPosX + x - arkaplanGenislik, y, 2);
+            else {
+                ekran.C(x, y, 0) = arkaplandevam.C(globalX - 800, y, 0);
+                ekran.C(x, y, 1) = arkaplandevam.C(globalX - 800, y, 1);
+                ekran.C(x, y, 2) = arkaplandevam.C(globalX - 800, y, 2);
             }
         }
     }
+
     KarakterCiz(ekran);
     DisplayImage(anaPencere, ekran);
 }
+
 
 // Klavye girdisini işleyen fonksiyon
 void klavyeGirdisi(int tus) {
@@ -73,7 +76,7 @@ void klavyeGirdisi(int tus) {
     case 39:
         if (karakterX < pencereGenislik - karakterKoordinatlar[animasyonKare][2]) {
             karakterX += hareketMesafesi;
-            if (karakterX > pencereGenislik / 2 && arkaplanPosX < 2 * arkaplanGenislik - pencereGenislik) {
+            if (karakterX > pencereGenislik / 2 && arkaplanPosX < 800) {
                 arkaplanPosX += hareketMesafesi;
             }
         }
@@ -97,12 +100,12 @@ void ICGUI_Create() {
 void ICGUI_main() {
     anaPencere = ICG_FramePanel(0, 0, pencereGenislik, pencereYukseklik);
 
-    if (!ReadImage("arkaplan.bmp", arkaplan)) {
-        MessageBox(NULL, "Arkaplan resmi yüklenemedi.", "Hata", MB_OK);
+    if (!ReadImage("arkaplanilk.bmp", arkaplanilk)) {
+        MessageBox(NULL, "Arkaplanilk resmi yüklenemedi.", "Hata", MB_OK);
         return;
     }
-    if (!ReadImage("arkaplan2.bmp", arkaplan2)) {
-        MessageBox(NULL, "Arkaplan2 resmi yüklenemedi.", "Hata", MB_OK);
+    if (!ReadImage("arkaplandevam.bmp", arkaplandevam)) {
+        MessageBox(NULL, "Arkaplandevam resmi yüklenemedi.", "Hata", MB_OK);
         return;
     }
     if (!ReadImage("karakter.bmp", karakter)) {
