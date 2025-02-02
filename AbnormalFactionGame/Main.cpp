@@ -11,17 +11,14 @@ const int ziplamaYuksekligi = 15; // Zıplama yüksekliği
 const int ziplamaHizi = 20;       // Her karede yukarı hareket mesafesi
 
 // Merdiven koordinatları
-const int merdivenX1 = 91, merdivenX2 = 282, merdivenY1 = 25, merdivenY2 = 74;
-
-// Karakterin merdiven üzerinde olup olmadığını kontrol eden fonksiyon
-bool merdivendeMi(int x, int y) {
-    return x >= merdivenX1 && x <= merdivenX2 && y >= merdivenY1 && y <= merdivenY2;
-}
-
+const int merdivenSolX = 126, merdivenSagX = 160;
+const int merdivenUstY = 200, merdivenAltY = 400;
 
 // Karakterin başlangıç pozisyonu
 int karakterX = 66, karakterY = 280;
 const int hareketMesafesi = 10; // Hareket mesafesi (piksel)
+
+int MouseLogBox; // Fare hareketlerini göstermek için metin kutusu
 
 // Arka plan için değişkenler
 int arkaplanPosX = 0; // Arka planın başlangıç pozisyonu
@@ -53,8 +50,81 @@ int balikYon = -1; // -1: Sağdan sola, 1: Soldan sağa
 const int balikHareketMesafesi = 5; // Balık hareket mesafesi
 int balikKoordinatlar[2][4] = { {35, 31, 31, 27}, {68, 26, 31, 33} }; // X, Y, Genişlik, Yükseklik
 
+// Taşlar (küçük platformlar) için koordinatlar
+struct Tas {
+    int x, y, genislik, yukseklik;
+};
+
+// Taşların orijinal koordinatları (taşlar kaydırmaya göre güncellenmeli)
+Tas taslar[] = {
+    {134, 338, 28, 20}, {174, 352, 28, 20}, {230, 295, 28, 20},
+    {264, 306, 28, 20}, {230, 349, 28, 20}, {265, 266, 28, 20},
+    {302, 268, 28, 20}
+};
+
+const int tasSayisi = sizeof(taslar) / sizeof(taslar[0]);
+
 int anaPencere;
 std::atomic<bool> calisiyor(true); // Thread kontrolü için
+
+const int suSeviyesi = 400; // Örnek su seviyesi
+
+// Karakterin merdiven üzerinde olup olmadığını kontrol eden fonksiyon
+bool merdivendeMi(int x, int y) {
+    int karakterMerkezX = x + karakterKoordinatlar[animasyonKare][2] / 2;
+    int karakterMerkezY = y + karakterKoordinatlar[animasyonKare][3] / 2;
+
+    return (karakterMerkezX >= 126 && karakterMerkezX <= 143 &&
+        karakterMerkezY >= 200 && karakterMerkezY <= 390);
+}
+
+
+bool sudaMi() {
+    return karakterY > suSeviyesi;
+}
+
+bool tasUzerindeMi() {
+    int karakterMerkezX = karakterX + karakterKoordinatlar[animasyonKare][2] / 2;
+    int karakterAltY = karakterY + karakterKoordinatlar[animasyonKare][3];
+
+    for (int i = 0; i < tasSayisi; i++) {
+        int tasGuncelX = (taslar[i].x - arkaplanPosX) % arkaplanGenislik; // Taşları arka plan kaymasına göre düzenle
+        int tasUstY = taslar[i].y; // Y konumu değişmeyeceği için sabit kalıyor
+
+        bool xUygun = (karakterMerkezX >= tasGuncelX && karakterMerkezX <= tasGuncelX + taslar[i].genislik);
+        bool yUygun = (karakterAltY >= tasUstY - 5 && karakterAltY <= tasUstY + 5);
+
+        if (xUygun && yUygun) {
+            return true;
+        }
+    }
+    return false;
+}
+
+
+void YerCekimi() {
+    if (!merdivendeMi(karakterX, karakterY) && !ziplamaAktif) {
+        if (!tasUzerindeMi()) { // Eğer taşın üstünde değilse düşmeye devam et
+            karakterY += hareketMesafesi;
+            if (karakterY > pencereYukseklik - karakterKoordinatlar[animasyonKare][3]) {
+                karakterY = pencereYukseklik - karakterKoordinatlar[animasyonKare][3];
+            }
+        }
+    }
+}
+
+void DrawRectangle(ICBYTES& ekran, int x, int y, int genislik, int yukseklik, int r, int g, int b) {
+    for (int i = 0; i < yukseklik; i++) {
+        for (int j = 0; j < genislik; j++) {
+            if (x + j >= 0 && x + j < pencereGenislik && y + i >= 0 && y + i < pencereYukseklik) {
+                ekran.C(x + j, y + i, 0) = r;
+                ekran.C(x + j, y + i, 1) = g;
+                ekran.C(x + j, y + i, 2) = b;
+            }
+        }
+    }
+}
+
 
 // Karakteri ekrana çizen fonksiyon
 void KarakterCiz(ICBYTES& ekran) {
@@ -108,7 +178,6 @@ void BalikCiz(ICBYTES& ekran) {
 }
 
 
-
 // Arka planı ve karakteri çizen fonksiyon
 void ekraniCiz() {
     ICBYTES ekran;
@@ -120,10 +189,11 @@ void ekraniCiz() {
             ekran.C(x, y, 0) = -1; // Kırmızı kanal
             ekran.C(x, y, 1) = 0; // Yeşil kanal
             ekran.C(x, y, 2) = 0; // Mavi kanal
+            ekran.C(x, y, 3) = 0x00;
         }
     }
 
-    // Arkaplanı çiz
+    // Arka planı çiz
     for (int y = 0; y < pencereYukseklik; y++) {
         for (int x = 0; x < pencereGenislik; x++) {
             int globalX = (arkaplanPosX + x) % arkaplanGenislik;
@@ -140,14 +210,21 @@ void ekraniCiz() {
         }
     }
 
+    // Taşları çiz (arka plan kaymasını hesaba kat)
+    for (int i = 0; i < tasSayisi; i++) {
+        int tasX = (taslar[i].x - arkaplanPosX) % arkaplanGenislik;  // Global konum hesaplaması
+        int tasY = taslar[i].y;
+        DrawRectangle(ekran, tasX, tasY, taslar[i].genislik, taslar[i].yukseklik, 255, 255, 255);
+    }
+
     KarakterCiz(ekran);
-    KusCiz(ekran);
-    BalikCiz(ekran);
     DisplayImage(anaPencere, ekran);
 }
 
+
+
 // Kuş hareketini güncelleyen fonksiyon
-DWORD WINAPI KusHareket(LPVOID lpParam) {
+/*/DWORD WINAPI KusHareket(LPVOID lpParam) {
     while (calisiyor) {
         kusX += kusYon * 5; // Kuşun hareket mesafesi
         if (kusYon == -1 && kusX <= 111) { // Sağdan sola giderken sınıra ulaştıysa
@@ -164,9 +241,9 @@ DWORD WINAPI KusHareket(LPVOID lpParam) {
         Sleep(100); // Kuşun hareket hızı
     }
     return 0;
-}
+}*/
 
-DWORD WINAPI BalikHareket(LPVOID lpParam) {
+/*DWORD WINAPI BalikHareket(LPVOID lpParam) {
     int hareketMesafesiSayaci = 0; // Balığın kaç piksel hareket ettiğini saymak için bir sayaç
 
     while (true) {
@@ -198,69 +275,96 @@ DWORD WINAPI BalikHareket(LPVOID lpParam) {
         Sleep(50);
     }
     return 0;
-}
+}*/
 
-// Klavye girdisini işleyen fonksiyon
 // Klavye girdisini işleyen fonksiyon
 void klavyeGirdisi(int tus) {
-    if (ziplamaAktif) return; // Zıplama sırasında başka hareket engellenir
+    if (ziplamaAktif) return;
 
     bool hareketEtti = false;
+    int ekranMerkezi = pencereGenislik / 2;
 
-    switch (tus) {
-    case 37: // Sol ok
-        if (karakterX > 0) {
-            karakterX -= hareketMesafesi;
-            hareketEtti = true;
-        }
-        break;
-    case 39: // Sağ ok
-        if (karakterX < pencereGenislik - karakterKoordinatlar[animasyonKare][2]) {
-            karakterX += hareketMesafesi;
-            hareketEtti = true;
-        }
-        break;
-    case 38: // Yukarı ok
-        if (merdivendeMi(karakterX, karakterY)) { // Merdivende yukarı çıkma kontrolü
-            karakterY -= hareketMesafesi;
-            hareketEtti = true;
-        }
-        break;
-    case 40: // Aşağı ok
-        if (merdivendeMi(karakterX, karakterY)) { // Merdivende aşağı inme kontrolü
-            karakterY += hareketMesafesi;
-            hareketEtti = true;
-        }
-        break;
-    case 32: // Space (zıplama)
-        ziplamaAktif = true;
-        std::thread([]() {
-            int baslangicY = karakterY;
-            while (karakterY > baslangicY - ziplamaYuksekligi) { // Yukarı zıplama
-                karakterY -= ziplamaHizi;
-                ekraniCiz();
-                std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    if (merdivendeMi(karakterX, karakterY)) {
+        switch (tus) {
+        case 38: // Yukarı ok (Merdivende yukarı çıkma)
+            if (karakterY > merdivenUstY) {
+                karakterY -= hareketMesafesi;
+                hareketEtti = true;
             }
-            while (karakterY < baslangicY) { // Aşağı düşme
-                karakterY += ziplamaHizi;
-                ekraniCiz();
-                std::this_thread::sleep_for(std::chrono::milliseconds(50));
-            }
-            ziplamaAktif = false; // Zıplama biter
-            }).detach();
             break;
+        case 40: // Aşağı ok (Merdivende aşağı inme)
+            if (karakterY < merdivenAltY) {
+                karakterY += hareketMesafesi;
+                hareketEtti = true;
+            }
+            break;
+        }
+    }
+    else {
+        switch (tus) {
+        case 37: // Sol ok (Sol hareket)
+            if (karakterX > 100) {
+                if (arkaplanPosX > 0) {
+                    arkaplanPosX -= hareketMesafesi;
+                }
+                else {
+                    karakterX -= hareketMesafesi;
+                }
+                hareketEtti = true;
+            }
+            break;
+        case 39: // Sağ ok (Sağ hareket)
+            if (karakterX < ekranMerkezi) {
+                karakterX += hareketMesafesi;
+            }
+            else if (arkaplanPosX + pencereGenislik < arkaplanGenislik) {
+                arkaplanPosX += hareketMesafesi;
+            }
+            else {
+                karakterX += hareketMesafesi;
+            }
+            hareketEtti = true;
+            break;
+        case 32: // Space (Zıplama)
+            if (!merdivendeMi(karakterX, karakterY)) {
+                ziplamaAktif = true;
+                std::thread([]() {
+                    int baslangicY = karakterY;
+
+                    // Yukarı çıkış
+                    while (karakterY > baslangicY - ziplamaYuksekligi) {
+                        karakterY -= ziplamaHizi;
+                        ekraniCiz();
+                        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+
+                        // Eğer karakter taşın üstüne çıkarsa zıplamayı durdur
+                        if (tasUzerindeMi()) {
+                            ziplamaAktif = false;
+                            return;
+                        }
+                    }
+
+                    // Aşağı iniş (Yerçekimi etkisi)
+                    while (!tasUzerindeMi() && karakterY < baslangicY) {
+                        karakterY += ziplamaHizi;
+                        ekraniCiz();
+                        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+                    }
+
+                    ziplamaAktif = false;
+                    }).detach();
+            }
+            break;
+
+        }
     }
 
-    // Hareket gerçekleştiyse animasyon karesini ilerlet
     if (hareketEtti) {
         animasyonKare = (animasyonKare + 1) % 3;
+        ICG_printf(MouseLogBox, "Karakter Konum: X=%d, Y=%d, ArkaplanX=%d\n", karakterX, karakterY, arkaplanPosX);
+        ekraniCiz();
     }
-
-    // Ekranı güncelle
-    ekraniCiz();
 }
-
-
 void ICGUI_Create() {
     ICG_MWSize(pencereGenislik, pencereYukseklik);
     ICG_MWTitle("Animasyonlu Karakter");
@@ -296,7 +400,7 @@ void ICGUI_main() {
     ekraniCiz(); // İlk ekran çizimi
 
     // Threadleri başlat
-    HANDLE threadKus = CreateThread(NULL, 0, KusHareket, NULL, 0, NULL);
+   /* HANDLE threadKus = CreateThread(NULL, 0, KusHareket, NULL, 0, NULL);
     if (!threadKus) {
         MessageBox(NULL, "Kuş hareket thread'i başlatılamadı.", "Hata", MB_OK);
         return;
@@ -306,9 +410,10 @@ void ICGUI_main() {
     if (!threadBalik) {
         MessageBox(NULL, "Balık hareket thread'i başlatılamadı.", "Hata", MB_OK);
         return;
-    }
+    }*/
 
     // Klavye girdisini bağla
     ICG_SetOnKeyPressed(klavyeGirdisi);
 
+    MouseLogBox = ICG_MLEditSunken(10, 700, 600, 80, "", SCROLLBAR_V);
 }
