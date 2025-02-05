@@ -181,29 +181,18 @@ void yuzmeModuGuncelle() {
     if (!merdivendeMi(karakterX, karakterY) && karakterY >= 370 && karakterX >= 176) {
         if (!yuzmede) {
             // Karakterin alt kısmı su yüzeyine hizalanmalı
-            karakterY = yuzmeAlaniY + 5;
+            karakterY = yuzmeAlaniY +5;
         }
         yuzmede = true;
     }
-    else if (karakterY < 370 || karakterX < 176) {
+    else if (karakterY < 370 || karakterX < 176 || (karakterX >= 566 && karakterY >= 420)) {
         yuzmede = false;
     }
 }
 
 
-void DrawRectangle(ICBYTES& ekran, int x, int y, int genislik, int yukseklik, int r, int g, int b) {
-    for (int i = 0; i < yukseklik; i++) {
-        for (int j = 0; j < genislik; j++) {
-            if (x + j >= 0 && x + j < pencereGenislik && y + i >= 0 && y + i < pencereYukseklik) {
-                ekran.C(x + j, y + i, 0) = r;
-                ekran.C(x + j, y + i, 1) = g;
-                ekran.C(x + j, y + i, 2) = b;
-            }
-        }
-    }
-}
-
 void YuzmeCiz(ICBYTES& ekran) {
+
     if (!yuzmede) return; // Eğer yüzme modunda değilse, çizme
 
     // 🎯 **Animasyon karesini sürekli değiştir**
@@ -291,32 +280,22 @@ void ekraniCiz() {
 
     for (int y = 0; y < pencereYukseklik; y++) {
         for (int x = 0; x < pencereGenislik; x++) {
-            int globalX = (arkaplanPosX + x) % arkaplanGenislik;
-            ekran.C(x, y, 0) = arkaplanilk.C(globalX, y % arkaplanYukseklik, 0);
-            ekran.C(x, y, 1) = arkaplanilk.C(globalX, y % arkaplanYukseklik, 1);
-            ekran.C(x, y, 2) = arkaplanilk.C(globalX, y % arkaplanYukseklik, 2);
-            ekran.C(x, y, 3) = 0x00;
+            int globalX = arkaplanPosX + x; // 🎯 **Arka planın kayma pozisyonunu ayarla**
 
-        }
-    }
-
-    // Arkaplanı çiz
-    for (int y = 0; y < pencereYukseklik; y++) {
-        for (int x = 0; x < pencereGenislik; x++) {
-            int globalX = (arkaplanPosX + x) % arkaplanGenislik;
+            // 🎯 **Eğer arkaplanPosX sınırı geçmediyse ilk arka planı göster**
             if (globalX < arkaplanGenislik / 2) {
-                ekran.C(x, y, 0) = arkaplanilk.C(globalX, y % arkaplanYukseklik, 0);
-                ekran.C(x, y, 1) = arkaplanilk.C(globalX, y % arkaplanYukseklik, 1);
-                ekran.C(x, y, 2) = arkaplanilk.C(globalX, y % arkaplanYukseklik, 2);
+                ekran.C(x, y, 0) = arkaplanilk.C(globalX % arkaplanGenislik, y % arkaplanYukseklik, 0);
+                ekran.C(x, y, 1) = arkaplanilk.C(globalX % arkaplanGenislik, y % arkaplanYukseklik, 1);
+                ekran.C(x, y, 2) = arkaplanilk.C(globalX % arkaplanGenislik, y % arkaplanYukseklik, 2);
             }
+            // 🎯 **Eğer arkaplanPosX ilerlediyse ikinci arka planı göster**
             else {
-                ekran.C(x, y, 0) = arkaplandevam.C(globalX - arkaplanGenislik / 2, y % arkaplanYukseklik, 0);
-                ekran.C(x, y, 1) = arkaplandevam.C(globalX - arkaplanGenislik / 2, y % arkaplanYukseklik, 1);
-                ekran.C(x, y, 2) = arkaplandevam.C(globalX - arkaplanGenislik / 2, y % arkaplanYukseklik, 2);
+                ekran.C(x, y, 0) = arkaplandevam.C((globalX - arkaplanGenislik / 2) % arkaplanGenislik, y % arkaplanYukseklik, 0);
+                ekran.C(x, y, 1) = arkaplandevam.C((globalX - arkaplanGenislik / 2) % arkaplanGenislik, y % arkaplanYukseklik, 1);
+                ekran.C(x, y, 2) = arkaplandevam.C((globalX - arkaplanGenislik / 2) % arkaplanGenislik, y % arkaplanYukseklik, 2);
             }
         }
     }
-
 
     if (yuzmede) {
         YuzmeCiz(ekran);
@@ -327,6 +306,7 @@ void ekraniCiz() {
 
     DisplayImage(anaPencere, ekran);
 }
+
 
 
 // Kuş hareketini güncelleyen fonksiyon
@@ -410,8 +390,9 @@ DWORD WINAPI BalikHareket(LPVOID lpParam) {
 // Klavye girdisini işleyen fonksiyon
 void klavyeGirdisi(int tus) {
     bool hareketEtti = false;
+    int ekranMerkezi = pencereGenislik / 2;
 
-    yuzmeModuGuncelle(); // Hareketten önce yüzme modunu güncelle
+    yuzmeModuGuncelle(); // 🎯 **Her hareketten önce yüzme modunu kontrol et**
 
     if (merdivendeMi(karakterX, karakterY)) {
         switch (tus) {
@@ -430,10 +411,10 @@ void klavyeGirdisi(int tus) {
         }
     }
     else if (yuzmede) {
-        // 📌 Yüzme alanı içinde serbestçe hareket edebilmesi için düzeltildi
+        // 🎯 **Karakter yüzme alanında serbest hareket edebilir**
         switch (tus) {
         case 37: // Sol
-            if (karakterX > yuzmeAlaniX) { // Sol sınıra çarpmaması için kontrol eklendi
+            if (karakterX > yuzmeAlaniX) {
                 karakterX -= hareketMesafesi;
                 hareketEtti = true;
             }
@@ -445,13 +426,13 @@ void klavyeGirdisi(int tus) {
             }
             break;
         case 38: // Yukarı
-            if (karakterY > yuzmeAlaniY) { // 📌 Yüzme alanının üst sınırını tam olarak algıla
+            if (karakterY > yuzmeAlaniY) {
                 karakterY -= hareketMesafesi;
                 hareketEtti = true;
             }
             break;
         case 40: // Aşağı
-            if (karakterY < (yuzmeAlaniY + yuzmeAlaniYukseklik - karakterKoordinatlar[animasyonKare][3])) {
+            if (karakterY < (yuzmeAlaniY + (yuzmeAlaniYukseklik - 30))) {
                 karakterY += hareketMesafesi;
                 hareketEtti = true;
             }
@@ -459,7 +440,7 @@ void klavyeGirdisi(int tus) {
         }
     }
     else {
-        int ekranMerkezi = pencereGenislik / 2;
+        // 🎯 **Karakter artık yüzmede değilse normal yürüme animasyonu devam eder**
         switch (tus) {
         case 37: // Sol
             if (karakterX > 100) {
@@ -472,40 +453,24 @@ void klavyeGirdisi(int tus) {
                 hareketEtti = true;
             }
             break;
+
         case 39: // Sağ
+            if (karakterX >= 560 && karakterY >= 415) {
+                yuzmede = false;  // Yüzme modundan çıkış
+            }
+
             if (karakterX < ekranMerkezi) {
                 karakterX += hareketMesafesi;
             }
             else if (arkaplanPosX + pencereGenislik < arkaplanGenislik) {
-                arkaplanPosX += hareketMesafesi;
+                arkaplanPosX += hareketMesafesi; // Ekranı sola kaydır
             }
             else {
                 karakterX += hareketMesafesi;
             }
             hareketEtti = true;
             break;
-        case 32: // Space (Zıplama)
-            if (!yuzmede) {
-                ziplamaAktif = true;
-                std::thread([]() {
-                    int baslangicY = karakterY;
 
-                    while (karakterY > baslangicY - ziplamaYuksekligi) {
-                        karakterY -= ziplamaHizi;
-                        ekraniCiz();
-                        std::this_thread::sleep_for(std::chrono::milliseconds(50));
-                    }
-
-                    while (karakterY < baslangicY) {
-                        karakterY += ziplamaHizi;
-                        ekraniCiz();
-                        std::this_thread::sleep_for(std::chrono::milliseconds(50));
-                    }
-
-                    ziplamaAktif = false;
-                    }).detach();
-            }
-            break;
         }
     }
 
@@ -515,6 +480,8 @@ void klavyeGirdisi(int tus) {
         ekraniCiz();
     }
 }
+
+
 
 
 
