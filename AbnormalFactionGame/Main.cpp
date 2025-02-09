@@ -75,7 +75,6 @@ std::atomic<bool> calisiyor(true); // Thread kontrolü için
 
 const int suSeviyesi = 400; // Örnek su seviyesi
 
-
 // Karakteri ekrana çizen fonksiyon
 void KarakterCiz(ICBYTES& ekran) {
     if (yuzmede) return; // Eğer karakter yüzüyorsa, normal çizim yapılmamalı
@@ -103,7 +102,6 @@ void KarakterCiz(ICBYTES& ekran) {
         }
     }
 }
-
 
 // Kuşu ekrana çizen fonksiyon
 void KusCiz(ICBYTES& ekran) {
@@ -185,11 +183,13 @@ void yuzmeModuGuncelle() {
         }
         yuzmede = true;
     }
-    else if (karakterY < 370 || karakterX < 176 || (karakterX >= 566 && karakterY >= 420)) {
+    else if (karakterX >= 486) {
         yuzmede = false;
+        karakterY = 370;
+        yüzmeAnimasyonKare = 0; //
+       
     }
 }
-
 
 void YuzmeCiz(ICBYTES& ekran) {
 
@@ -215,19 +215,16 @@ void YuzmeCiz(ICBYTES& ekran) {
     }
 }
 
-
-
 void YerCekimi() {
-    if (yuzmede) return; // Eğer yüzme modundaysa, yerçekimi uygulanmasın
+    if (yuzmede || ziplamaAktif) return;
 
-    if (!merdivendeMi(karakterX, karakterY) && !ziplamaAktif) {
-        karakterY += hareketMesafesi;
+    if (!merdivendeMi(karakterX, karakterY)) {
+        karakterY += hareketMesafesi / 2; // Yer çekimi yavaşlatıldı
         if (karakterY > pencereYukseklik - karakterKoordinatlar[animasyonKare][3]) {
             karakterY = pencereYukseklik - karakterKoordinatlar[animasyonKare][3];
         }
     }
 }
-
 
 int GoldEkranX() {
     return goldX - arkaplanPosX;
@@ -280,15 +277,13 @@ void ekraniCiz() {
 
     for (int y = 0; y < pencereYukseklik; y++) {
         for (int x = 0; x < pencereGenislik; x++) {
-            int globalX = arkaplanPosX + x; // 🎯 **Arka planın kayma pozisyonunu ayarla**
+            int globalX = arkaplanPosX + x;
 
-            // 🎯 **Eğer arkaplanPosX sınırı geçmediyse ilk arka planı göster**
             if (globalX < arkaplanGenislik / 2) {
                 ekran.C(x, y, 0) = arkaplanilk.C(globalX % arkaplanGenislik, y % arkaplanYukseklik, 0);
                 ekran.C(x, y, 1) = arkaplanilk.C(globalX % arkaplanGenislik, y % arkaplanYukseklik, 1);
                 ekran.C(x, y, 2) = arkaplanilk.C(globalX % arkaplanGenislik, y % arkaplanYukseklik, 2);
             }
-            // 🎯 **Eğer arkaplanPosX ilerlediyse ikinci arka planı göster**
             else {
                 ekran.C(x, y, 0) = arkaplandevam.C((globalX - arkaplanGenislik / 2) % arkaplanGenislik, y % arkaplanYukseklik, 0);
                 ekran.C(x, y, 1) = arkaplandevam.C((globalX - arkaplanGenislik / 2) % arkaplanGenislik, y % arkaplanYukseklik, 1);
@@ -304,10 +299,12 @@ void ekraniCiz() {
         KarakterCiz(ekran);
     }
 
+    KusCiz(ekran);
+    BalikCiz(ekran);
+    YarasaCiz(ekran);
+    GoldCiz(ekran);
     DisplayImage(anaPencere, ekran);
 }
-
-
 
 // Kuş hareketini güncelleyen fonksiyon
 DWORD WINAPI KusHareket(LPVOID lpParam) {
@@ -392,7 +389,7 @@ void klavyeGirdisi(int tus) {
     bool hareketEtti = false;
     int ekranMerkezi = pencereGenislik / 2;
 
-    yuzmeModuGuncelle(); // 🎯 **Her hareketten önce yüzme modunu kontrol et**
+    yuzmeModuGuncelle(); // **Yüzme durumunu güncelle**
 
     if (merdivendeMi(karakterX, karakterY)) {
         switch (tus) {
@@ -411,7 +408,6 @@ void klavyeGirdisi(int tus) {
         }
     }
     else if (yuzmede) {
-        // 🎯 **Karakter yüzme alanında serbest hareket edebilir**
         switch (tus) {
         case 37: // Sol
             if (karakterX > yuzmeAlaniX) {
@@ -438,11 +434,17 @@ void klavyeGirdisi(int tus) {
             }
             break;
         }
+
+        if (karakterX >= 486) {
+            yuzmede = false;
+            karakterY = 370;
+            yüzmeAnimasyonKare = 0;
+            hareketEtti = true;
+        }
     }
     else {
-        // 🎯 **Karakter artık yüzmede değilse normal yürüme animasyonu devam eder**
         switch (tus) {
-        case 37: // Sol
+        case 37: // **Sol**
             if (karakterX > 100) {
                 if (arkaplanPosX > 0) {
                     arkaplanPosX -= hareketMesafesi;
@@ -453,25 +455,51 @@ void klavyeGirdisi(int tus) {
                 hareketEtti = true;
             }
             break;
-
-        case 39: // Sağ
-            if (karakterX >= 560 && karakterY >= 415) {
-                yuzmede = false;  // Yüzme modundan çıkış
-            }
-
-            if (karakterX < ekranMerkezi) {
-                karakterX += hareketMesafesi;
-            }
-            else if (arkaplanPosX + pencereGenislik < arkaplanGenislik) {
+        case 39: // **Sağ**
+            if (karakterX >= ekranMerkezi && arkaplanPosX + pencereGenislik < arkaplanGenislik) {
                 arkaplanPosX += hareketMesafesi; // Ekranı sola kaydır
             }
             else {
-                karakterX += hareketMesafesi;
+                karakterX += hareketMesafesi; // Ekran kayamazsa karakteri ilerlet
             }
+
+            // 🎯 Yüzmeden çıktıktan sonra bile arka plan kaymaya devam etmeli
+            if (!yuzmede && karakterX >= ekranMerkezi && arkaplanPosX < arkaplanGenislik / 2) {
+                arkaplanPosX += hareketMesafesi;
+            }
+
+
             hareketEtti = true;
             break;
 
+        case 32: // **Space (Zıplama)**
+            if (!ziplamaAktif && !yuzmede) {
+                ziplamaAktif = true;
+                
+                std::thread([]() {
+                    int baslangicY = karakterY;
+
+                    // Yukarı çıkış
+                    while (karakterY > baslangicY - ziplamaYuksekligi) {
+                        karakterY -= ziplamaHizi;
+                        ekraniCiz();
+                        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+
+                    }
+
+                        while (karakterY < baslangicY) {
+                            karakterY += ziplamaHizi;
+                            ekraniCiz();
+                            std::this_thread::sleep_for(std::chrono::milliseconds(50));
+                        }
+                        ziplamaAktif = false;
+                    }).detach();
+            }
+            break;
         }
+    }
+    if (karakterX > pencereGenislik / 2 && !ziplamaAktif) {
+        arkaplanPosX += hareketMesafesi / 2;
     }
 
     if (hareketEtti) {
@@ -480,11 +508,6 @@ void klavyeGirdisi(int tus) {
         ekraniCiz();
     }
 }
-
-
-
-
-
 
 void ICGUI_Create() {
     ICG_MWSize(pencereGenislik, pencereYukseklik);
