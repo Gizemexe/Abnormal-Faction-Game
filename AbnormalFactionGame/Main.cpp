@@ -20,7 +20,7 @@ ICBYTES arkaplanilk, arkaplandevam; // İki arka plan resmi
 // Karakter animasyonu için değişkenler
 ICBYTES karakter; // Karakter sprite dosyası
 int animasyonKare = 0; // Şu anki animasyon karesi
-int karakterKoordinatlar[3][4] = { {8, 9, 40, 60}, {58, 10, 40, 60}, {110, 10, 40, 60} }; // X, Y, Genişlik, Yükseklik
+int karakterKoordinatlar[3][4] = { { 8, 9, 40, 60 }, { 58, 10, 40, 60 }, { 110, 10, 40, 60 } }; // X, Y, Genişlik, Yükseklik
 
 // Zıplama durumu ve ayarları
 bool ziplamaAktif = false;
@@ -74,6 +74,9 @@ int anaPencere;
 std::atomic<bool> calisiyor(true); // Thread kontrolü için
 
 const int suSeviyesi = 400; // Örnek su seviyesi
+int oyunFrame;
+
+bool altinAlindi = false;
 
 // Karakteri ekrana çizen fonksiyon
 void KarakterCiz(ICBYTES& ekran) {
@@ -84,24 +87,26 @@ void KarakterCiz(ICBYTES& ekran) {
     int kareGenislik = karakterKoordinatlar[animasyonKare][2];
     int kareYukseklik = karakterKoordinatlar[animasyonKare][3];
 
-    // Önce eski karakteri temizle
-    for (int y = 0; y < kareYukseklik; y++) {
-        for (int x = 0; x < kareGenislik; x++) {
-            ekran.C(karakterX + x, karakterY + y, 0) = arkaplanilk.C(karakterX + x, karakterY + y, 0);
-            ekran.C(karakterX + x, karakterY + y, 1) = arkaplanilk.C(karakterX + x, karakterY + y, 1);
-            ekran.C(karakterX + x, karakterY + y, 2) = arkaplanilk.C(karakterX + x, karakterY + y, 2);
-        }
+    // Geçici bir sprite matrisi oluştur
+    ICBYTES gecici;
+    CreateMatrix(gecici, kareGenislik, kareYukseklik, 4, ICB_UCHAR);
+
+    // Karakter sprite'ını kopyala
+    if (!Copy(karakter, kareX, kareY, kareGenislik, kareYukseklik, gecici)) {
+       
+        return;
     }
 
-    // Yeni karakteri çiz
-    for (int y = 0; y < kareYukseklik; y++) {
-        for (int x = 0; x < kareGenislik; x++) {
-            ekran.C(karakterX + x, karakterY + y, 0) = karakter.C(kareX + x, kareY + y, 0);
-            ekran.C(karakterX + x, karakterY + y, 1) = karakter.C(kareX + x, kareY + y, 1);
-            ekran.C(karakterX + x, karakterY + y, 2) = karakter.C(kareX + x, kareY + y, 2);
-        }
+    // Karakter sprite'ını ekrana yapıştır
+    if (!PasteNon0(gecici, karakterX, karakterY, ekran)) {
+        
     }
+
+    // Bellek temizleme
+    Free(gecici);
 }
+
+
 
 // Kuşu ekrana çizen fonksiyon
 void KusCiz(ICBYTES& ekran) {
@@ -110,17 +115,23 @@ void KusCiz(ICBYTES& ekran) {
     int kareGenislik = kusKoordinatlar[kusAnimasyonKare][2];
     int kareYukseklik = kusKoordinatlar[kusAnimasyonKare][3];
 
-    for (int y = 0; y < kareYukseklik; y++) {
-        for (int x = 0; x < kareGenislik; x++) {
-            unsigned char alpha = kus.C(kareX + x, kareY + y, 3); // Alfa kanalı
-            if (alpha > 0) { // Sadece transparan olmayan pikselleri çiz
-                ekran.C(kusX + x, kusY + y, 0) = kus.C(kareX + x, kareY + y, 0);
-                ekran.C(kusX + x, kusY + y, 1) = kus.C(kareX + x, kusY + y, 1);
-                ekran.C(kusX + x, kusY + y, 2) = kus.C(kareX + x, kusY + y, 2);
-            }
-        }
+    ICBYTES gecici;
+    CreateMatrix(gecici, kareGenislik, kareYukseklik, 4, ICB_UCHAR);
+
+    if (!Copy(kus, kareX, kareY, kareGenislik, kareYukseklik, gecici)) {
+        printf("HATA: Kuş sprite'ı kopyalanamadı!\n");
+        return;
     }
+
+    if (!PasteNon0(gecici, kusX, kusY, ekran)) {
+        printf("HATA: Kuş sprite'ı ekrana yapıştırılamadı!\n");
+    }
+
+    Free(gecici);
 }
+
+
+
 
 // Balığı ekrana çizen fonksiyon
 void BalikCiz(ICBYTES& ekran) {
@@ -129,33 +140,55 @@ void BalikCiz(ICBYTES& ekran) {
     int kareGenislik = balikKoordinatlar[balikYon == -1 ? 0 : 1][2];
     int kareYukseklik = balikKoordinatlar[balikYon == -1 ? 0 : 1][3];
 
-    for (int y = 0; y < kareYukseklik; y++) {
-        for (int x = 0; x < kareGenislik; x++) {
-            ekran.C(balikX + x, balikY + y, 0) = fish.C(kareX + x, kareY + y, 0);
-            ekran.C(balikX + x, balikY + y, 1) = fish.C(kareX + x, kareY + y, 1);
-            ekran.C(balikX + x, balikY + y, 2) = fish.C(kareX + x, kareY + y, 2);
-        }
+    // Geçici sprite matrisi oluştur
+    ICBYTES gecici;
+    CreateMatrix(gecici, kareGenislik, kareYukseklik, 4, ICB_UCHAR);
+
+    // Balık sprite'ını kopyala
+    if (!Copy(fish, kareX, kareY, kareGenislik, kareYukseklik, gecici)) {
+        
+        return;
     }
+
+    // Balık sprite'ını ekrana yapıştır
+    if (!PasteNon0(gecici, balikX, balikY, ekran)) {
+       
+    }
+
+    // Bellek temizleme
+    Free(gecici);
 }
+
+
 
 // Yarasa ekrana çizen fonksiyon
 void YarasaCiz(ICBYTES& ekran) {
-    int kareX = yarasaKoordinatlar[yarasaYon == -1 ? 0 : 1][0];
-    int kareY = yarasaKoordinatlar[yarasaYon == -1 ? 0 : 1][1];
-    int kareGenislik = yarasaKoordinatlar[yarasaYon == -1 ? 0 : 1][2];
-    int kareYukseklik = yarasaKoordinatlar[yarasaYon == -1 ? 0 : 1][3];
+    int index = (yarasaYon == -1) ? 0 : 1;
+    int kareX = yarasaKoordinatlar[index][0];
+    int kareY = yarasaKoordinatlar[index][1];
+    int kareGenislik = yarasaKoordinatlar[index][2];
+    int kareYukseklik = yarasaKoordinatlar[index][3];
 
-    for (int y = 0; y < kareYukseklik; y++) {
-        for (int x = 0; x < kareGenislik; x++) {
-            unsigned char alpha = yarasa.C(kareX + x, kareY + y, 3); // Alfa kanalı kontrolü
-            if (alpha > 0) { // Transparan olmayan pikselleri çiz
-                ekran.C(yarasaX + x, yarasaY + y, 0) = yarasa.C(kareX + x, kareY + y, 0);
-                ekran.C(yarasaX + x, yarasaY + y, 1) = yarasa.C(kareX + x, kareY + y, 1);
-                ekran.C(yarasaX + x, yarasaY + y, 2) = yarasa.C(kareX + x, kareY + y, 2);
-            }
-        }
+    // Geçici sprite matrisi oluştur
+    ICBYTES gecici;
+    CreateMatrix(gecici, kareGenislik, kareYukseklik, 4, ICB_UCHAR);
+
+    // Yarasa sprite'ını kopyala
+    if (!Copy(yarasa, kareX, kareY, kareGenislik, kareYukseklik, gecici)) {
+       
+        return;
     }
+
+    // Yarasa sprite'ını ekrana yapıştır
+    if (!PasteNon0(gecici, yarasaX, yarasaY, ekran)) {
+    
+    }
+
+    // Bellek temizleme
+    Free(gecici);
 }
+
+
 
 // Karakterin merdiven üzerinde olup olmadığını kontrol eden fonksiyon
 bool merdivendeMi(int x, int y) {
@@ -179,7 +212,7 @@ void yuzmeModuGuncelle() {
     if (!merdivendeMi(karakterX, karakterY) && karakterY >= 370 && karakterX >= 176) {
         if (!yuzmede) {
             // Karakterin alt kısmı su yüzeyine hizalanmalı
-            karakterY = yuzmeAlaniY +5;
+            karakterY = yuzmeAlaniY + 5;
         }
         yuzmede = true;
     }
@@ -187,13 +220,12 @@ void yuzmeModuGuncelle() {
         yuzmede = false;
         karakterY = 370;
         yüzmeAnimasyonKare = 0; //
-       
+
     }
 }
 
 void YuzmeCiz(ICBYTES& ekran) {
-
-    if (!yuzmede) return; // Eğer yüzme modunda değilse, çizme
+    if (!yuzmede) return; // Eğer yüzme modunda değilse, çizme işlemini yapma
 
     // 🎯 **Animasyon karesini sürekli değiştir**
     yüzmeAnimasyonKare = (yüzmeAnimasyonKare + 1) % 4;
@@ -206,14 +238,20 @@ void YuzmeCiz(ICBYTES& ekran) {
     // 🎯 **Karakterin alt kısmından başlaması için ayarla**
     int cizimY = karakterY - (kareYukseklik / 2);
 
-    for (int y = 0; y < kareYukseklik; y++) {
-        for (int x = 0; x < kareGenislik; x++) {
-            ekran.C(karakterX + x, cizimY + y, 0) = yüzme.C(kareX + x, kareY + y, 0);
-            ekran.C(karakterX + x, cizimY + y, 1) = yüzme.C(kareX + x, kareY + y, 1);
-            ekran.C(karakterX + x, cizimY + y, 2) = yüzme.C(kareX + x, kareY + y, 2);
-        }
-    }
+    // Geçici bir sprite matrisi oluştur
+    ICBYTES gecici;
+    CreateMatrix(gecici, kareGenislik, kareYukseklik, 4, ICB_UCHAR);
+
+    // **Yüzme sprite'ını kopyala**
+    Copy(yüzme, kareX, kareY, kareGenislik, kareYukseklik, gecici);
+
+    // **Yüzme sprite'ını ekrana yapıştır**
+    PasteNon0(gecici, karakterX, cizimY, ekran);
+
+    // **Bellek temizleme**
+    Free(gecici);
 }
+
 
 void YerCekimi() {
     if (yuzmede || ziplamaAktif) return;
@@ -275,22 +313,33 @@ void ekraniCiz() {
     ICBYTES ekran;
     CreateMatrix(ekran, pencereGenislik, pencereYukseklik, 3, ICB_UCHAR);
 
+    // Ekranı siyah (0, 0, 0) ile doldur
     for (int y = 0; y < pencereYukseklik; y++) {
         for (int x = 0; x < pencereGenislik; x++) {
-            int globalX = arkaplanPosX + x;
+            ekran.C(x, y, 0) = -1; // Kırmızı kanal
+            ekran.C(x, y, 1) = 0; // Yeşil kanal
+            ekran.C(x, y, 2) = 0; // Mavi kanal
+            ekran.C(x, y, 3) = 0x00;
+        }
+    }
 
+
+    for (int y = 0; y < pencereYukseklik; y++) {
+        for (int x = 0; x < pencereGenislik; x++) {
+            int globalX = (arkaplanPosX + x) % arkaplanGenislik;
             if (globalX < arkaplanGenislik / 2) {
-                ekran.C(x, y, 0) = arkaplanilk.C(globalX % arkaplanGenislik, y % arkaplanYukseklik, 0);
-                ekran.C(x, y, 1) = arkaplanilk.C(globalX % arkaplanGenislik, y % arkaplanYukseklik, 1);
-                ekran.C(x, y, 2) = arkaplanilk.C(globalX % arkaplanGenislik, y % arkaplanYukseklik, 2);
+                ekran.C(x, y, 0) = arkaplanilk.C(globalX, y % arkaplanYukseklik, 0);
+                ekran.C(x, y, 1) = arkaplanilk.C(globalX, y % arkaplanYukseklik, 1);
+                ekran.C(x, y, 2) = arkaplanilk.C(globalX, y % arkaplanYukseklik, 2);
             }
             else {
-                ekran.C(x, y, 0) = arkaplandevam.C((globalX - arkaplanGenislik / 2) % arkaplanGenislik, y % arkaplanYukseklik, 0);
-                ekran.C(x, y, 1) = arkaplandevam.C((globalX - arkaplanGenislik / 2) % arkaplanGenislik, y % arkaplanYukseklik, 1);
-                ekran.C(x, y, 2) = arkaplandevam.C((globalX - arkaplanGenislik / 2) % arkaplanGenislik, y % arkaplanYukseklik, 2);
+                ekran.C(x, y, 0) = arkaplandevam.C(globalX - arkaplanGenislik / 2, y % arkaplanYukseklik, 0);
+                ekran.C(x, y, 1) = arkaplandevam.C(globalX - arkaplanGenislik / 2, y % arkaplanYukseklik, 1);
+                ekran.C(x, y, 2) = arkaplandevam.C(globalX - arkaplanGenislik / 2, y % arkaplanYukseklik, 2);
             }
         }
     }
+
 
     if (yuzmede) {
         YuzmeCiz(ekran);
@@ -306,83 +355,6 @@ void ekraniCiz() {
     DisplayImage(anaPencere, ekran);
 }
 
-// Kuş hareketini güncelleyen fonksiyon
-DWORD WINAPI KusHareket(LPVOID lpParam) {
-    while (calisiyor) {
-        kusX += kusYon * 5; // Kuşun hareket mesafesi
-        if (kusYon == -1 && kusX <= 111) { // Sağdan sola giderken sınıra ulaştıysa
-            kusYon = 1; // Yön değiştir
-            kusAnimasyonKare = 2; // Soldan sağa animasyon başlasın
-        }
-        if (kusYon == 1 && kusX >= 312) { // Soldan sağa giderken sınıra ulaştıysa
-            kusYon = -1; // Yön değiştir
-            kusAnimasyonKare = 0; // Sağdan sola animasyon başlasın
-        }
-
-        ekraniCiz(); // Ekranı güncelle
-
-        Sleep(100); // Kuşun hareket hızı
-    }
-    return 0;
-}
-DWORD WINAPI YarasaHareket(LPVOID lpParam) {
-    int hareketMesafesiSayaci = 0;
-
-    while (calisiyor) {
-        yarasaX += yarasaYon * yarasaHareketMesafesi;
-        hareketMesafesiSayaci += yarasaHareketMesafesi;
-
-        // Yön değiştir
-        if (hareketMesafesiSayaci >= 350) {
-            yarasaYon *= -1;
-            hareketMesafesiSayaci = 0;
-        }
-
-        // Sınır kontrolü
-        if (yarasaX < 0 || yarasaX + yarasaKoordinatlar[0][2] > pencereGenislik) {
-            yarasaYon *= -1;
-            hareketMesafesiSayaci = 0;
-        }
-
-        ekraniCiz();
-        Sleep(50); // Hareket hızı
-    }
-    return 0;
-}
-
-DWORD WINAPI BalikHareket(LPVOID lpParam) {
-    int hareketMesafesiSayaci = 0; // Balığın kaç piksel hareket ettiğini saymak için bir sayaç
-
-    while (calisiyor) {
-        // Balığın mevcut yönününe göre X pozisyonunu güncelle
-        balikX += balikYon * balikHareketMesafesi;
-        hareketMesafesiSayaci += balikHareketMesafesi;
-
-        // Belirli bir mesafeden sonra yön değiştir
-        if (hareketMesafesiSayaci >= 350) { // Örneğin 200 piksel gittikten sonra
-            balikYon *= -1; // Yön değişimi
-            hareketMesafesiSayaci = 0; // Sayaç sıfırlanır
-        }
-
-        // Sınır kontrolü
-        if (balikX < 0 || balikX + balikKoordinatlar[0][2] > pencereGenislik) {
-            balikYon *= -1; // Yön değiştir
-
-        }
-
-        // Ekran sınırlarına geldiğinde yön değiştir
-        if (balikX < 0 || balikX + balikKoordinatlar[0][2] > pencereGenislik) {
-            balikYon *= -1; // Yön değişimi
-            hareketMesafesiSayaci = 0; // Sayaç sıfırlanır
-        }
-
-        ekraniCiz(); // Ekranı sürekli yeniden çiz
-
-        // Balığın hareket hızını ayarlamak için gecikme süresi
-        Sleep(50);
-    }
-    return 0;
-}
 
 // Klavye girdisini işleyen fonksiyon
 void klavyeGirdisi(int tus) {
@@ -452,7 +424,7 @@ void klavyeGirdisi(int tus) {
                 else {
                     karakterX -= hareketMesafesi;
                 }
-                hareketEtti = true;
+               // hareketEtti = true;
             }
             break;
         case 39: // **Sağ**
@@ -475,7 +447,7 @@ void klavyeGirdisi(int tus) {
         case 32: // **Space (Zıplama)**
             if (!ziplamaAktif && !yuzmede) {
                 ziplamaAktif = true;
-                
+
                 std::thread([]() {
                     int baslangicY = karakterY;
 
@@ -487,12 +459,12 @@ void klavyeGirdisi(int tus) {
 
                     }
 
-                        while (karakterY < baslangicY) {
-                            karakterY += ziplamaHizi;
-                            ekraniCiz();
-                            std::this_thread::sleep_for(std::chrono::milliseconds(50));
-                        }
-                        ziplamaAktif = false;
+                    while (karakterY < baslangicY) {
+                        karakterY += ziplamaHizi;
+                        ekraniCiz();
+                        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+                    }
+                    ziplamaAktif = false;
                     }).detach();
             }
             break;
@@ -556,31 +528,7 @@ void ICGUI_main() {
 
     ekraniCiz(); // İlk ekran çizimi
 
-   /* // Threadleri başlat
-    HANDLE threadKus = CreateThread(NULL, 0, KusHareket, NULL, 0, NULL);
-    /*if (!threadKus) {
-        MessageBox(NULL, "Kuş hareket thread'i başlatılamadı.", "Hata", MB_OK);
-        return;
-    }*/
-
-    /*HANDLE threadBalik = CreateThread(NULL, 0, BalikHareket, NULL, 0, NULL);
-    /*if (!threadBalik) {
-        MessageBox(NULL, "Balık hareket thread'i başlatılamadı.", "Hata", MB_OK);
-        return;
-    }*/
-
-    /*HANDLE threadYarasa = CreateThread(NULL, 0, YarasaHareket, NULL, 0, NULL);
-    /*if (!threadYarasa) {
-        MessageBox(NULL, "Yarasa hareket thread'i başlatılamadı.", "Hata", MB_OK);
-        return;
-    }*/
-
-    /*if (!threadKus || !threadBalik || !threadYarasa) {
-        MessageBox(NULL, "Hareket thread'i başlatılamadı.", "Hata", MB_OK);
-        return;
-    }*/
-
-    //Klavye girdisini bağla
+     //Klavye girdisini bağla
     ICG_SetOnKeyPressed(klavyeGirdisi);
 
     MouseLogBox = ICG_MLEditSunken(10, 700, 600, 80, "", SCROLLBAR_V);
