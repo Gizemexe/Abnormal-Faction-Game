@@ -29,12 +29,10 @@ make build  # or compile using your preferred compiler</code></pre>
     <li><code>Space</code> - Jump</li>
 </ul>
 
-<h2>🛠 Built With</h2>
-<ul>
-    <li><strong>C++</strong> - Core game logic</li>
-    <li><strong>ICBYTES</strong> - Graphics and UI management</li>
-    <li><strong>ICGUI</strong> - Game interface rendering</li>
-</ul>
+## 🛠 Built With
+
+- <strong>C++</strong> - Core game logic <br>
+- <strong>ICBYTES</strong> - Graphics and UI management [You can download it here](https://github.com/cembaykal/ICBYTES) 
 
 <h2>📜 Code Overview</h2>
 <p>Main game loop handling screen updates and animations:</p>
