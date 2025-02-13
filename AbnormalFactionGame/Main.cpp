@@ -355,7 +355,6 @@ void ekraniCiz() {
     DisplayImage(anaPencere, ekran);
 }
 
-
 // Klavye girdisini işleyen fonksiyon
 void klavyeGirdisi(int tus) {
     bool hareketEtti = false;
